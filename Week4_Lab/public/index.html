@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log In and Register Menu</title>
+    <link rel="stylesheet" href="styles.css">
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, deleteUser, updateProfile } 
+        from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDoc, doc, deleteDoc } 
+        from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+        // Firebase SDK configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCQSy6hwesKJ0PxAccUs9zcDH7vrahuA9k",
+            authDomain: "mydev-7aafc.firebaseapp.com",
+            projectId: "mydev-7aafc",
+            storageBucket: "mydev-7aafc.firebasestorage.app",
+            messagingSenderId: "299952181450",
+            appId: "1:299952181450:web:245168f5af7e0a8a59e433"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const db = getFirestore(app);
+
+        // Login function
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value;
+            const password = document.getElementById("loginPassword").value;
+            
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Retrieve user data from Firestore
+                const docRef = doc(db, "users", user.uid);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    document.getElementById("welcomeMessage").innerText = `Hi, ${docSnap.data().name}!`;
+                } else {
+                    document.getElementById("welcomeMessage").innerText = `Hi, you're logged in!`;
+                }
+
+                document.getElementById("loginScreen").style.display = "none";
+                document.getElementById("dashboard").style.display = "block";
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Register function (Adds user data to Firestore)
+        document.getElementById("registerForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const name = document.getElementById("registerName").value;
+            const email = document.getElementById("registerEmail").value;
+            const password = document.getElementById("registerPassword").value;
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Update user profile
+                await updateProfile(user, { displayName: name });
+
+                // Store user data in Firestore
+                await addDoc(collection(db, "users"), {
+                    uid: user.uid,
+                    name: name,
+                    email: email
+                });
+
+                alert("Registration successful! Please log in.");
+                document.getElementById("registerScreen").style.display = "none";
+                document.getElementById("loginScreen").style.display = "block";
+            } catch (error) {
+                alert(error.message);
+            }
+        });
+
+        // Logout function (Clears email and password fields)
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            signOut(auth).then(() => {
+                document.getElementById("dashboard").style.display = "none";
+                document.getElementById("loginScreen").style.display = "block";
+
+                // Clear login input fields
+                document.getElementById("loginEmail").value = "";
+                document.getElementById("loginPassword").value = "";
+            });
+        });
+
+        // Delete account function (removes from Firestore first, then deletes authentication)
+        document.getElementById("deleteBtn").addEventListener("click", async () => {
+            const user = auth.currentUser;
+
+            if (!user) {
+                alert("No user is currently logged in.");
+                return;
+            }
+
+            try {
+                // Step 1: Delete user data from Firestore
+                const userDocRef = doc(db, "users", user.uid);
+                await deleteDoc(userDocRef);
+                console.log("User data deleted from Firestore.");
+
+                // Step 2: Delete user from Firebase Authentication
+                await deleteUser(user);
+                alert("Account deleted successfully.");
+
+                // Step 3: Redirect to login screen
+                document.getElementById("dashboard").style.display = "none";
+                document.getElementById("loginScreen").style.display = "block";
+
+                // Clear login input fields
+                document.getElementById("loginEmail").value = "";
+                document.getElementById("loginPassword").value = "";
+            } catch (error) {
+                alert("Error deleting account: " + error.message);
+            }
+        });
+
+
+        // Switch to Register
+        document.getElementById("showRegister").addEventListener("click", () => {
+            document.getElementById("loginScreen").style.display = "none";
+            document.getElementById("registerScreen").style.display = "block";
+        });
+
+        // Switch to Login
+        document.getElementById("showLogin").addEventListener("click", () => {
+            document.getElementById("registerScreen").style.display = "none";
+            document.getElementById("loginScreen").style.display = "block";
+        });
+
+    </script>
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="container">
+        <h1>Login</h1>
+        <form id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p>Don't have an account? <a href="#" id="showRegister">Register</a></p>
+    </div>
+
+    <!-- Register Screen -->
+    <div id="registerScreen" class="container" style="display: none;">
+        <h1>Register</h1>
+        <form id="registerForm">
+            <input type="text" id="registerName" placeholder="Full Name" required>
+            <input type="email" id="registerEmail" placeholder="Email" required>
+            <input type="password" id="registerPassword" placeholder="Password" required>
+            <button type="submit">Register</button>
+        </form>
+        <p>Already have an account? <a href="#" id="showLogin">Login</a></p>
+    </div>
+
+    <!-- Dashboard (After Login) -->
+    <div id="dashboard" class="container" style="display: none;">
+        <h1 id="welcomeMessage"></h1>
+        <button id="logoutBtn">Logout</button>
+        <button id="deleteBtn">Delete Account</button>
+    </div>
+
+</body>
+</html>
